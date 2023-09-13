@@ -8,12 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/Drelf2018/TypeGo/Queue"
 	"github.com/Drelf2018/event"
-	"github.com/Drelf2020/utils"
 	"github.com/fsnotify/fsnotify"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
@@ -28,11 +26,28 @@ type Resource struct {
 	mu     sync.Mutex
 }
 
-func (r *Resource) OnEqual(cmd fsnotify.Op, handle func(name string)) func() {
+func (r *Resource) MakeDir(path string) {
+	os.MkdirAll(path, os.ModePerm)
+}
+
+func (r *Resource) Store(path string, data []byte) {
+	dir, file := filepath.Split(path)
+	r.MakeDir(dir)
+	f, ok := r.Root.MakeTo(dir).Touch(file, 0)
+	if ok {
+		f.Store(data)
+	}
+}
+
+func (r *Resource) Write(path, data string) {
+	r.Store(path, []byte(data))
+}
+
+func (r *Resource) onEqual(cmd fsnotify.Op, handle func(name string)) func() {
 	return r.AsyncEvent.OnCommand(cmd, event.OnlyData(handle))
 }
 
-func (r *Resource) Init(root string) {
+func (r *Resource) Init(root string) *Resource {
 	r.AsyncEvent = event.New[fsnotify.Op](114514)
 	r.Watcher, _ = fsnotify.NewWatcher()
 	r.rename = make(map[string]string)
@@ -45,7 +60,7 @@ func (r *Resource) Init(root string) {
 		q.Next(f.Folders.I...)
 	}
 
-	r.OnEqual(fsnotify.Write, func(e string) {
+	r.onEqual(fsnotify.Write, func(e string) {
 		r.Root.Transport(e).IsFile(
 			func(root *Folder, file *File, name string, info os.FileInfo) {
 				if info.Size() == 0 {
@@ -61,7 +76,7 @@ func (r *Resource) Init(root string) {
 		)
 	})
 
-	r.OnEqual(fsnotify.Remove, func(e string) {
+	r.onEqual(fsnotify.Remove, func(e string) {
 		r.Root.Transport(e).IsFile(
 			func(root *Folder, file *File, name string, info os.FileInfo) {
 				root.Delete(file)
@@ -73,7 +88,7 @@ func (r *Resource) Init(root string) {
 		)
 	})
 
-	r.OnEqual(fsnotify.Create, func(e string) {
+	r.onEqual(fsnotify.Create, func(e string) {
 		r.mu.Lock()
 		l := len(r.rename)
 		if l == 0 {
@@ -89,10 +104,7 @@ func (r *Resource) Init(root string) {
 			r.mu.Unlock()
 		}
 
-		sep := string(os.PathSeparator)
-		name := strings.Replace(e, r.Root.Path(), "", 1)
-		name = utils.Cut(name, sep, sep, 0)
-		_, isDir := r.Root.Create(strings.Split(name, sep))
+		_, isDir := r.Root.Create(Split(r.Root.Replace(e)))
 		if isDir {
 			r.Watcher.Add(e)
 		}
@@ -126,9 +138,11 @@ func (r *Resource) Init(root string) {
 			go r.AsyncEvent.Dispatch(event.Op, event.Name)
 		}
 	}()
+
+	return r
 }
 
-func readLine() (r []string) {
+func ReadLine() (r []string) {
 	var cmd string
 	for {
 		n, err := fmt.Scanf("%s", &cmd)
@@ -148,15 +162,19 @@ func decodeSimplifiedChinese(b []byte) string {
 	return string(b)
 }
 
-func (r *Resource) Shell(name string) {
-	r.Init(name)
-	defer r.Watcher.Close()
-	anchor := r.Root
+func (r *Resource) Close() {
+	r.Watcher.Close()
+}
 
+func (r *Resource) Shell(read func() []string) {
+	anchor := r.Root
+	if read == nil {
+		read = ReadLine
+	}
 outer:
 	for {
 		print("Go ", anchor.Path(), "> ")
-		cmds := readLine()
+		cmds := read()
 		notFound := false
 		switch len(cmds) {
 		case 1:
@@ -177,7 +195,7 @@ outer:
 			switch cmds[0] {
 			case "cd":
 				var next *Folder = anchor
-				for _, p := range strings.Split(cmds[1], "/") {
+				for _, p := range Split(cmds[1]) {
 					if p == ".." {
 						next = next.Back
 					} else {

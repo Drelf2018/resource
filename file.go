@@ -35,6 +35,27 @@ func (f *File) Path(file ...string) string {
 	return filepath.Join(slices.Insert(file, 0, f.cache)...)
 }
 
+func (f *File) Load() []byte {
+	b, _ := os.ReadFile(f.Path())
+	return b
+}
+
+func (f *File) Read() string {
+	return string(f.Load())
+}
+
+func (f *File) Store(data []byte) {
+	os.WriteFile(f.Path(), data, os.ModePerm)
+}
+
+func (f *File) Write(data string) {
+	f.Store([]byte(data))
+}
+
+func (f *File) Remove() {
+	os.Remove(f.Path())
+}
+
 func (f *File) String() string {
 	return fmt.Sprintf("File(%v, %v)", f.Name, f.Size)
 }
@@ -71,6 +92,19 @@ func (f *Folder) CD(path string) *Folder {
 	return f.Folders.Search(&Folder{File: File{Name: path}})
 }
 
+func (f *Folder) JumpTo(path string) *Folder {
+	for _, d := range Split(f.Replace(path)) {
+		if d == "" {
+			continue
+		}
+		f = f.CD(d)
+		if f == nil {
+			return nil
+		}
+	}
+	return f
+}
+
 func (f *Folder) mkdir(path string) *Folder {
 	return &Folder{
 		File:    *f.touch(path),
@@ -91,6 +125,20 @@ func (f *Folder) Mkdir(path string) (*Folder, bool) {
 func (f *Folder) Child(path string) *Folder {
 	c, _ := f.Mkdir(path)
 	return c
+}
+
+func (f *Folder) MakeTo(path string) *Folder {
+	for _, d := range Split(f.Replace(path)) {
+		if d == "" {
+			continue
+		}
+		f, _ = f.Mkdir(path)
+	}
+	return f
+}
+
+func (f *Folder) RemoveAll() {
+	os.RemoveAll(f.Path())
 }
 
 func (f *Folder) Delete(c interface{ Byte() int64 }) {
@@ -189,6 +237,18 @@ func (a *Anchor) IsFile(f func(root *Folder, file *File, name string, info os.Fi
 	return a
 }
 
+const SEP = string(os.PathSeparator)
+
+func Split(path string) []string {
+	path = utils.Cut(path, SEP, SEP, 0)
+	return strings.Split(path, SEP)
+}
+
+func (f *Folder) Replace(path string) string {
+	abs, _ := filepath.Abs(f.Path())
+	return strings.Replace(path, abs, "", 1)
+}
+
 func (f *Folder) Transport(path string, names ...string) *Anchor {
 	var name string
 	if len(names) != 0 {
@@ -196,18 +256,9 @@ func (f *Folder) Transport(path string, names ...string) *Anchor {
 	} else {
 		path, name = filepath.Split(path)
 	}
-	sep := string(os.PathSeparator)
-	abs, _ := filepath.Abs(f.Path())
-	path = strings.Replace(path, abs, "", 1)
-	path = utils.Cut(path, sep, sep, 0)
-	for _, d := range strings.Split(path, sep) {
-		if d == "" {
-			continue
-		}
-		f = f.CD(d)
-		if f == nil {
-			return nil
-		}
+	f = f.JumpTo(path)
+	if f == nil {
+		return nil
 	}
 	info, _ := os.Stat(f.Path(name))
 	return &Anchor{

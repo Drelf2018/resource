@@ -8,5 +8,5 @@ import (
 
 func main() {
 	dir, _ := os.Getwd()
-	new(resource.Resource).Shell(dir)
+	new(resource.Resource).Init(dir).Shell(resource.ReadLine)
 }
