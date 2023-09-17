@@ -39,25 +39,47 @@ func (f *File) Parent() Explorer {
 	return f.Back
 }
 
-func (f *File) Load() []byte {
-	b, _ := os.ReadFile(f.Path())
+func (f *File) Load() ([]byte, error) {
+	return os.ReadFile(f.Path())
+}
+
+func (f *File) MustLoad() []byte {
+	b, _ := f.Load()
 	return b
 }
 
-func (f *File) Read() string {
-	return string(f.Load())
+func (f *File) Read() (string, error) {
+	b, err := f.Load()
+	return string(b), err
 }
 
-func (f *File) Store(data []byte) {
-	os.WriteFile(f.Path(), data, os.ModePerm)
+func (f *File) MustRead() string {
+	s, _ := f.Read()
+	return s
 }
 
-func (f *File) Write(data string) {
-	f.Store([]byte(data))
+func (f *File) Store(data []byte) error {
+	return os.WriteFile(f.Path(), data, os.ModePerm)
 }
 
-func (f *File) Remove() {
-	os.Remove(f.Path())
+func (f *File) MustStore(data []byte) {
+	f.Store(data)
+}
+
+func (f *File) Write(data string) error {
+	return f.Store([]byte(data))
+}
+
+func (f *File) MustWrite(data string) {
+	f.Write(data)
+}
+
+func (f *File) Remove() error {
+	return os.Remove(f.Path())
+}
+
+func (f *File) MustRemove() {
+	f.Remove()
 }
 
 func (f *File) String() string {
@@ -149,6 +171,10 @@ func (f *Folder) MakeTo(path string) Explorer {
 		f, _ = f.Mkdir(path)
 	}
 	return f
+}
+
+func (f *Folder) MkdirAll() {
+	os.MkdirAll(f.Path(), os.ModePerm)
 }
 
 func (f *Folder) RemoveAll() {

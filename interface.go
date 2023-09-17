@@ -16,6 +16,8 @@ type Explorer interface {
 	JumpTo(path string) Explorer
 	MakeTo(path string) Explorer
 	List() Chan.Chan[fmt.Stringer]
-	RemoveAll()
 	Replace(path string) string
+
+	MkdirAll()
+	RemoveAll()
 }
