@@ -135,7 +135,7 @@ func (f *Folder) JumpTo(path string) Explorer {
 		}
 		anchor = anchor.CD(d)
 		if anchor == (*Folder)(nil) {
-			return nil
+			return anchor
 		}
 	}
 	return anchor
