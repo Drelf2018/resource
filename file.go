@@ -35,10 +35,6 @@ func (f *File) Path(file ...string) string {
 	return filepath.Join(slices.Insert(file, 0, f.cache)...)
 }
 
-func (f *File) Parent() Explorer {
-	return f.Back
-}
-
 func (f *File) Load() ([]byte, error) {
 	return os.ReadFile(f.Path())
 }
@@ -123,22 +119,21 @@ func (f *Folder) Touch(name string, size int64) (*File, bool) {
 // Instead of:
 //
 //	f.CD("xxx") == nil
-func (f *Folder) CD(path string) Explorer {
+func (f *Folder) CD(path string) *Folder {
 	return f.Folders.Search(&Folder{File: File{Name: path}})
 }
 
-func (f *Folder) JumpTo(path string) Explorer {
-	var anchor Explorer = f
+func (f *Folder) JumpTo(path string) *Folder {
 	for _, d := range Split(f.Replace(path)) {
 		if d == "" {
 			continue
 		}
-		anchor = anchor.CD(d)
-		if anchor == (*Folder)(nil) {
-			return anchor
+		f = f.CD(d)
+		if f == nil {
+			return nil
 		}
 	}
-	return anchor
+	return f
 }
 
 func (f *Folder) mkdir(path string) *Folder {
@@ -150,7 +145,7 @@ func (f *Folder) mkdir(path string) *Folder {
 }
 
 func (f *Folder) Mkdir(path string) (*Folder, bool) {
-	if c := f.CD(path).(*Folder); c != nil {
+	if c := f.CD(path); c != nil {
 		return c, false
 	}
 	folder := f.mkdir(path)
@@ -181,17 +176,21 @@ func (f *Folder) RemoveAll() {
 	os.RemoveAll(f.Path())
 }
 
-func (f *Folder) Delete(c interface{ Byte() int64 }) {
+func (f *Folder) Delete(c interface{ Path(...string) string }) {
 	if c == nil {
 		return
 	}
+	var size int64
 	switch c := c.(type) {
 	case *File:
 		f.Files.Delete(c)
+		size = -c.Size.Byte()
 	case *Folder:
 		f.Folders.Delete(c)
+		size = -c.Size.Byte()
+	default:
+		return
 	}
-	var size int64 = -c.Byte()
 	for f != nil {
 		f.Size.Add(size)
 		f = f.Back
@@ -296,14 +295,14 @@ func (f *Folder) Transport(path string, names ...string) *Anchor {
 	} else {
 		path, name = filepath.Split(path)
 	}
-	f = f.JumpTo(path).(*Folder)
+	f = f.JumpTo(path)
 	if f == nil {
 		return nil
 	}
 	info, _ := os.Stat(f.Path(name))
 	return &Anchor{
 		root: f,
-		dir:  f.CD(name).(*Folder),
+		dir:  f.CD(name),
 		file: f.Find(name),
 		name: name,
 		info: info,
