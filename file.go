@@ -35,6 +35,10 @@ func (f *File) Path(file ...string) string {
 	return filepath.Join(slices.Insert(file, 0, f.cache)...)
 }
 
+func (f *File) Parent() Explorer {
+	return f.Back
+}
+
 func (f *File) Load() []byte {
 	b, _ := os.ReadFile(f.Path())
 	return b
@@ -88,21 +92,22 @@ func (f *Folder) Touch(name string, size int64) (*File, bool) {
 	return file, true
 }
 
-func (f *Folder) CD(path string) *Folder {
+func (f *Folder) CD(path string) Explorer {
 	return f.Folders.Search(&Folder{File: File{Name: path}})
 }
 
-func (f *Folder) JumpTo(path string) *Folder {
+func (f *Folder) JumpTo(path string) Explorer {
+	var anchor Explorer = f
 	for _, d := range Split(f.Replace(path)) {
 		if d == "" {
 			continue
 		}
-		f = f.CD(d)
-		if f == nil {
+		anchor = anchor.CD(d)
+		if anchor == nil {
 			return nil
 		}
 	}
-	return f
+	return anchor
 }
 
 func (f *Folder) mkdir(path string) *Folder {
@@ -115,7 +120,7 @@ func (f *Folder) mkdir(path string) *Folder {
 
 func (f *Folder) Mkdir(path string) (*Folder, bool) {
 	if c := f.CD(path); c != nil {
-		return c, false
+		return c.(*Folder), false
 	}
 	folder := f.mkdir(path)
 	f.Folders.Insert(folder)
@@ -127,7 +132,7 @@ func (f *Folder) Child(path string) *Folder {
 	return c
 }
 
-func (f *Folder) MakeTo(path string) *Folder {
+func (f *Folder) MakeTo(path string) Explorer {
 	for _, d := range Split(f.Replace(path)) {
 		if d == "" {
 			continue
@@ -251,20 +256,21 @@ func (f *Folder) Replace(path string) string {
 
 func (f *Folder) Transport(path string, names ...string) *Anchor {
 	var name string
+	var anchor Explorer = f
 	if len(names) != 0 {
 		name = strings.Join(names, " ")
 	} else {
 		path, name = filepath.Split(path)
 	}
-	f = f.JumpTo(path)
-	if f == nil {
+	anchor = anchor.JumpTo(path)
+	if anchor == nil {
 		return nil
 	}
 	info, _ := os.Stat(f.Path(name))
 	return &Anchor{
-		root: f,
-		dir:  f.CD(name),
-		file: f.Find(name),
+		root: anchor.(*Folder),
+		dir:  anchor.CD(name).(*Folder),
+		file: anchor.Find(name),
 		name: name,
 		info: info,
 	}

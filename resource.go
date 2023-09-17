@@ -194,10 +194,10 @@ outer:
 		inner:
 			switch cmds[0] {
 			case "cd":
-				var next *Folder = anchor
+				var next Explorer = anchor
 				for _, p := range Split(cmds[1]) {
 					if p == ".." {
-						next = next.Back
+						next = next.Parent()
 					} else {
 						next = next.CD(p)
 					}
@@ -206,7 +206,7 @@ outer:
 						break inner
 					}
 				}
-				anchor = next
+				anchor = next.(*Folder)
 			case "mkdir":
 				anchor.Mkdir(cmds[1])
 			case "find":
