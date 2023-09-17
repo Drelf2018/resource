@@ -92,6 +92,15 @@ func (f *Folder) Touch(name string, size int64) (*File, bool) {
 	return file, true
 }
 
+// Warning: if you want to check the returning Explorer whether nil.
+//
+// You need to use:
+//
+//	f.CD("xxx") == (*Folder)(nil)
+//
+// Instead of:
+//
+//	f.CD("xxx") == nil
 func (f *Folder) CD(path string) Explorer {
 	return f.Folders.Search(&Folder{File: File{Name: path}})
 }
@@ -103,7 +112,7 @@ func (f *Folder) JumpTo(path string) Explorer {
 			continue
 		}
 		anchor = anchor.CD(d)
-		if anchor == nil {
+		if anchor == (*Folder)(nil) {
 			return nil
 		}
 	}
@@ -119,8 +128,8 @@ func (f *Folder) mkdir(path string) *Folder {
 }
 
 func (f *Folder) Mkdir(path string) (*Folder, bool) {
-	if c := f.CD(path); c != nil {
-		return c.(*Folder), false
+	if c := f.CD(path).(*Folder); c != nil {
+		return c, false
 	}
 	folder := f.mkdir(path)
 	f.Folders.Insert(folder)
@@ -256,21 +265,20 @@ func (f *Folder) Replace(path string) string {
 
 func (f *Folder) Transport(path string, names ...string) *Anchor {
 	var name string
-	var anchor Explorer = f
 	if len(names) != 0 {
 		name = strings.Join(names, " ")
 	} else {
 		path, name = filepath.Split(path)
 	}
-	anchor = anchor.JumpTo(path)
-	if anchor == nil {
+	f = f.JumpTo(path).(*Folder)
+	if f == nil {
 		return nil
 	}
 	info, _ := os.Stat(f.Path(name))
 	return &Anchor{
-		root: anchor.(*Folder),
-		dir:  anchor.CD(name).(*Folder),
-		file: anchor.Find(name),
+		root: f,
+		dir:  f.CD(name).(*Folder),
+		file: f.Find(name),
 		name: name,
 		info: info,
 	}
