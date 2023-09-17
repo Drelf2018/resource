@@ -15,9 +15,9 @@ import (
 )
 
 type File struct {
-	Name string `cmps:"1"`
-	Back *Folder
-	Size
+	Name  string  `cmps:"1" json:"name"`
+	Back  *Folder `json:"-"`
+	Size  Size    `json:"size"`
 	cache string
 }
 
@@ -88,8 +88,8 @@ func (f *File) String() string {
 
 type Folder struct {
 	File    `cmps:"1"`
-	Files   cmps.SafeSlice[*File]
-	Folders cmps.SafeSlice[*Folder]
+	Files   cmps.SafeSlice[*File]   `json:"files"`
+	Folders cmps.SafeSlice[*Folder] `json:"folders"`
 }
 
 func (f *Folder) String() string {

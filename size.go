@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -24,6 +25,10 @@ type Size struct {
 	total    int64
 	piece    [5]smap
 	maxIndex int
+}
+
+func (s *Size) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
 }
 
 func (s *Size) hasMaxKey() bool {
