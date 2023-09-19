@@ -7,8 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sync"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/Drelf2018/TypeGo/Queue"
 	"github.com/Drelf2018/event"
