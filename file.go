@@ -5,8 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/Drelf2018/TypeGo/Chan"
 	"github.com/Drelf2018/asyncio"
